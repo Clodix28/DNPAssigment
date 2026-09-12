@@ -1,6 +1,6 @@
-using RepositoryContracts;
-
 namespace CLI.UI.ManageUsers;
+
+using RepositoryContracts;
 
 public class ListUsersView
 {
@@ -9,5 +9,15 @@ public class ListUsersView
     public ListUsersView(IUserRepository userRepository)
     {
         _userRepository = userRepository;
+    }
+
+    public Task ShowAsync()
+    {
+        Console.WriteLine("\n--- All Users ---");
+        foreach (var user in _userRepository.GetMany())
+        {
+            Console.WriteLine($"[{user.Id}] {user.Username}");
+        }
+        return Task.CompletedTask;
     }
 }
