@@ -7,9 +7,9 @@ public class CommentInMemoryRepository : ICommentRepository
 {
     private readonly List<Comment> _comments = new()
     {
-        new Comment { PostId = 1, UserId = 94141, Body = "Really enjoyed reading this."},
-        new Comment { PostId = 2, UserId = 4124321, Body = "I don't think that's quite right."},
-        new Comment { PostId = 3, UserId = 423423, Body = "This helped me a lot, appreciate it." },
+        new Comment { PostId = 1, UserId = 1, Body = "Really enjoyed reading this."},
+        new Comment { PostId = 2, UserId = 2, Body = "I don't think that's quite right."},
+        new Comment { PostId = 3, UserId = 3, Body = "This helped me a lot, appreciate it." },
     };
 
     public Task<Comment> AddAsync(Comment comment)

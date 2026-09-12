@@ -7,9 +7,9 @@ public class UserInMemoryRepository : IUserRepository
 {
     private readonly List<User> _users = new()
     {
-        new User { Id = 1 },
-        new User { Id = 2 },
-        new User { Id = 3 },
+        new User { Id = 1, Email = "claudiu@ggg.com",  Password = "password" , Username = "claudiu" },
+        new User { Id = 2, Email = "george@ggg.com", Password = "password", Username = "george" },
+        new User { Id = 3, Email = "vikinka@ggg.com", Password = "password", Username = "viki" },    
     };
 
     public Task<User> AddAsync(User user)
