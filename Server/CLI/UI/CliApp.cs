@@ -3,7 +3,6 @@ using CLI.UI.ManagePosts;
 using CLI.UI.ManageUsers;
 
 namespace CLI.UI;
-using InMemoryRepositories;
 using RepositoryContracts;
 
 public class CliApp
