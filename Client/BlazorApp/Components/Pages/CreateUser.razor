@@ -1,0 +1,83 @@
+@page "/users/create"
+@inject IUserService UserService
+
+<PageTitle>New user</PageTitle>
+
+<div class="narrow">
+    <h1>Create a user</h1>
+    <p class="muted">Pick a username and password. You'll use them to log in.</p>
+
+    <div class="panel">
+        <div class="form">
+            <label>
+                Username
+                <input @bind="username" />
+            </label>
+            <label>
+                Password
+                <input type="password" @bind="password" />
+            </label>
+            <label>
+                <span>Email <span class="hint">(optional)</span></span>
+                <input type="email" @bind="email" />
+            </label>
+            <button @onclick="CreateAsync" disabled="@isSaving">Create user</button>
+        </div>
+
+        @if (!string.IsNullOrEmpty(createdName))
+        {
+            <p class="notice ok">User <strong>@createdName</strong> created. <a href="login">Log in</a> to start posting.</p>
+        }
+        @if (!string.IsNullOrEmpty(error))
+        {
+            <p class="notice error">@error</p>
+        }
+    </div>
+</div>
+
+@code {
+    private string username = "";
+    private string password = "";
+    private string email = "";
+
+    private string createdName = "";
+    private string error = "";
+    private bool isSaving;
+
+    private async Task CreateAsync()
+    {
+        createdName = "";
+        error = "";
+
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+        {
+            error = "Username and password can't be empty.";
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            UserDto created = await UserService.AddUserAsync(new CreateUserDto
+            {
+                Username = username,
+                Password = password,
+                Email = string.IsNullOrWhiteSpace(email) ? null : email
+            });
+
+            createdName = created.Username;
+            username = "";
+            password = "";
+            email = "";
+        }
+        catch (Exception e)
+        {
+            // usually "username already taken" coming back from the API
+            error = e.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+}

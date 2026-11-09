@@ -1,0 +1,72 @@
+@page "/posts"
+@inject IPostService PostService
+@inject IUserService UserService
+
+<PageTitle>Posts</PageTitle>
+
+<div class="page-head">
+    <h1>Posts</h1>
+    <a class="button" href="posts/create">New post</a>
+</div>
+
+@if (!string.IsNullOrEmpty(error))
+{
+    <p class="notice error">@error</p>
+}
+else if (posts == null)
+{
+    <p class="muted">Loading posts...</p>
+}
+else if (posts.Count == 0)
+{
+    <div class="panel empty">
+        <h2>No posts yet</h2>
+        <p class="muted">Start the first thread and it'll show up here.</p>
+        <a class="button" href="posts/create">Write a post</a>
+    </div>
+}
+else
+{
+    <ul class="thread-list">
+        @foreach (PostDto post in posts)
+        {
+            <li>
+                <a class="thread" href="posts/@post.Id">
+                    <Avatar Name="@AuthorName(post.UserId)" UserId="@post.UserId" />
+                    <span class="thread-text">
+                        <span class="thread-title">@post.Title</span>
+                        <span class="thread-preview">@post.Body</span>
+                        <span class="muted small">by @AuthorName(post.UserId)</span>
+                    </span>
+                </a>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    private List<PostDto>? posts;
+    private Dictionary<int, string> userNames = new();
+    private string error = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            posts = await PostService.GetPostsAsync();
+
+            // PostDto only has the user id, so grab all users once to show names
+            List<UserDto> users = await UserService.GetUsersAsync();
+            userNames = users.ToDictionary(u => u.Id, u => u.Username);
+        }
+        catch (Exception e)
+        {
+            error = e.Message;
+        }
+    }
+
+    private string AuthorName(int userId)
+    {
+        return userNames.TryGetValue(userId, out string? name) ? name : $"user #{userId}";
+    }
+}

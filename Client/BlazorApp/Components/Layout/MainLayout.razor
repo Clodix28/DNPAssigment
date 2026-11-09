@@ -1,0 +1,48 @@
+@inherits LayoutComponentBase
+@inject AuthenticationStateProvider AuthProvider
+@inject NavigationManager NavMgr
+
+<header class="top-bar">
+    <a class="brand" href="">Forum</a>
+    <nav>
+        <NavLink href="" Match="NavLinkMatch.All">Home</NavLink>
+        <NavLink href="posts" Match="NavLinkMatch.All">Posts</NavLink>
+        <NavLink href="posts/create">New post</NavLink>
+        <NavLink href="users/create">New user</NavLink>
+    </nav>
+    <div class="account">
+        <AuthorizeView>
+            <Authorized>
+                <Avatar Name="@context.User.Identity?.Name" UserId="@UserIdOf(context.User)" Small="true" />
+                <span class="account-name">@context.User.Identity?.Name</span>
+                <button class="link-button" @onclick="Logout">Log out</button>
+            </Authorized>
+            <NotAuthorized>
+                <a href="login">Log in</a>
+            </NotAuthorized>
+        </AuthorizeView>
+    </div>
+</header>
+
+<main>
+    @Body
+</main>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    private void Logout()
+    {
+        ((SimpleAuthProvider)AuthProvider).Logout();
+        NavMgr.NavigateTo("/");
+    }
+
+    private static int UserIdOf(ClaimsPrincipal user)
+    {
+        return int.TryParse(user.FindFirst("Id")?.Value, out int id) ? id : 0;
+    }
+}

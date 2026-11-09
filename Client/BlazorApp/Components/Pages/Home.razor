@@ -1,0 +1,24 @@
+@page "/"
+@inject NavigationManager NavMgr
+
+<PageTitle>Forum</PageTitle>
+
+<AuthorizeView>
+    <Authorized>
+        <h1>Hi, @context.User.Identity?.Name</h1>
+        <p class="lead">See what's new in the posts, or start a thread of your own.</p>
+        <div class="actions">
+            <a class="button" href="posts">Browse posts</a>
+            <a class="button secondary" href="posts/create">Write a post</a>
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <h1>Forum</h1>
+        <p class="lead">Anyone can read the posts. Log in to write posts and reply to them.</p>
+        <div class="actions">
+            <button @onclick='() => NavMgr.NavigateTo("login")'>Log in</button>
+            <a class="button secondary" href="posts">Browse posts</a>
+        </div>
+        <p class="muted">No account yet? <a href="users/create">Create a user</a>.</p>
+    </NotAuthorized>
+</AuthorizeView>

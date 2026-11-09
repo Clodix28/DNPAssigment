@@ -1,0 +1,14 @@
+<span class="avatar avatar-@(Math.Abs(UserId) % 6) @(Small ? "small" : "")" aria-hidden="true">@Initial</span>
+
+@code {
+    [Parameter]
+    public string? Name { get; set; }
+
+    [Parameter]
+    public int UserId { get; set; }
+
+    [Parameter]
+    public bool Small { get; set; }
+
+    private string Initial => string.IsNullOrEmpty(Name) ? "?" : Name.Substring(0, 1).ToUpper();
+}

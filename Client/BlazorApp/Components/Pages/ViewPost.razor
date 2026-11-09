@@ -1,0 +1,173 @@
+@page "/posts/{Id:int}"
+@inject IPostService PostService
+@inject ICommentService CommentService
+@inject IUserService UserService
+
+<PageTitle>@(post?.Title ?? "Post")</PageTitle>
+
+<a class="back-link" href="posts">All posts</a>
+
+@if (!string.IsNullOrEmpty(loadError))
+{
+    <p class="notice error">@loadError</p>
+}
+else if (post == null)
+{
+    <p class="muted">Loading post...</p>
+}
+else
+{
+    <article class="panel">
+        <div class="byline">
+            <Avatar Name="@AuthorName(post.UserId)" UserId="@post.UserId" />
+            <div>
+                <strong>@AuthorName(post.UserId)</strong>
+                <span class="muted small">posted this</span>
+            </div>
+        </div>
+        <h1>@post.Title</h1>
+        <p class="post-body">@post.Body</p>
+    </article>
+
+    <section class="comments">
+        <h2>@(comments.Count == 1 ? "1 comment" : $"{comments.Count} comments")</h2>
+
+        @if (comments.Count == 0)
+        {
+            <p class="muted">No replies yet.</p>
+        }
+        else
+        {
+            <ul class="comment-list">
+                @foreach (CommentDto comment in comments)
+                {
+                    <li class="comment">
+                        <Avatar Name="@AuthorName(comment.UserId)" UserId="@comment.UserId" Small="true" />
+                        <div>
+                            <div class="comment-author">@AuthorName(comment.UserId)</div>
+                            <p class="comment-body">@comment.Body</p>
+                        </div>
+                    </li>
+                }
+            </ul>
+        }
+
+        <AuthorizeView>
+            <Authorized>
+                <div class="panel composer">
+                    <div class="form">
+                        <label>
+                            Reply as @context.User.Identity?.Name
+                            <textarea @bind="newComment"></textarea>
+                        </label>
+                        <button @onclick="AddCommentAsync" disabled="@isSaving">Post comment</button>
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(commentError))
+                    {
+                        <p class="notice error">@commentError</p>
+                    }
+                </div>
+            </Authorized>
+            <NotAuthorized>
+                <p class="composer muted"><a href="login">Log in</a> to reply to this post.</p>
+            </NotAuthorized>
+        </AuthorizeView>
+    </section>
+}
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    [CascadingParameter]
+    public Task<AuthenticationState> State { get; set; } = null!;
+
+    private PostDto? post;
+    private List<CommentDto> comments = new();
+    private Dictionary<int, string> userNames = new();
+
+    private string newComment = "";
+    private string loadError = "";
+    private string commentError = "";
+    private bool isSaving;
+
+    // OnParametersSet instead of OnInitialized so it reloads if you go from one post straight to another
+    protected override async Task OnParametersSetAsync()
+    {
+        loadError = "";
+        post = null;
+
+        try
+        {
+            post = await PostService.GetPostAsync(Id);
+            comments = await CommentService.GetCommentsAsync(postId: Id);
+
+            List<UserDto> users = await UserService.GetUsersAsync();
+            userNames = users.ToDictionary(u => u.Id, u => u.Username);
+        }
+        catch (Exception e)
+        {
+            loadError = e.Message;
+        }
+    }
+
+    private async Task AddCommentAsync()
+    {
+        commentError = "";
+
+        if (string.IsNullOrWhiteSpace(newComment))
+        {
+            commentError = "Write something before posting.";
+            return;
+        }
+
+        int? userId = await GetLoggedInUserIdAsync();
+        if (userId == null)
+        {
+            commentError = "You're not logged in anymore, log in again.";
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            await CommentService.AddCommentAsync(new CreateCommentDto
+            {
+                Body = newComment,
+                UserId = userId.Value,
+                PostId = Id
+            });
+
+            newComment = "";
+            comments = await CommentService.GetCommentsAsync(postId: Id);
+        }
+        catch (Exception e)
+        {
+            commentError = e.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    // same helper as on the create post page, reads the "Id" claim from the login
+    private async Task<int?> GetLoggedInUserIdAsync()
+    {
+        AuthenticationState authState = await State;
+        ClaimsPrincipal user = authState.User;
+        if (user.Identity == null || !user.Identity.IsAuthenticated)
+        {
+            return null;
+        }
+
+        Claim? idClaim = user.Claims.SingleOrDefault(c => c.Type == "Id");
+        return idClaim == null ? null : int.Parse(idClaim.Value);
+    }
+
+    private string AuthorName(int userId)
+    {
+        return userNames.TryGetValue(userId, out string? name) ? name : $"user #{userId}";
+    }
+}

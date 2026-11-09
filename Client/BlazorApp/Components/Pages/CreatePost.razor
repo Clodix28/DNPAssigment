@@ -1,0 +1,109 @@
+@page "/posts/create"
+@inject IPostService PostService
+@inject NavigationManager Navigation
+
+<PageTitle>New post</PageTitle>
+
+<h1>New post</h1>
+
+<AuthorizeView>
+    <Authorized>
+        <div class="panel">
+            <div class="byline">
+                <Avatar Name="@context.User.Identity?.Name" UserId="@UserIdOf(context.User)" Small="true" />
+                <span class="muted">Posting as <strong>@context.User.Identity?.Name</strong></span>
+            </div>
+            <div class="form">
+                <label>
+                    Title
+                    <input @bind="title" />
+                </label>
+                <label>
+                    Body
+                    <textarea @bind="body"></textarea>
+                </label>
+                <button @onclick="CreateAsync" disabled="@isSaving">Publish post</button>
+            </div>
+
+            @if (!string.IsNullOrEmpty(error))
+            {
+                <p class="notice error">@error</p>
+            }
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        <div class="panel empty">
+            <h2>Log in to write a post</h2>
+            <p class="muted">Posts are published under your username.</p>
+            <a class="button" href="login">Log in</a>
+        </div>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    [CascadingParameter]
+    public Task<AuthenticationState> State { get; set; } = null!;
+
+    private string title = "";
+    private string body = "";
+    private string error = "";
+    private bool isSaving;
+
+    private async Task CreateAsync()
+    {
+        error = "";
+
+        if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(body))
+        {
+            error = "Add a title and a body before publishing.";
+            return;
+        }
+
+        int? userId = await GetLoggedInUserIdAsync();
+        if (userId == null)
+        {
+            error = "You're not logged in anymore, log in again.";
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            PostDto created = await PostService.AddPostAsync(new CreatePostDto
+            {
+                Title = title,
+                Body = body,
+                UserId = userId.Value
+            });
+
+            Navigation.NavigateTo($"posts/{created.Id}");
+        }
+        catch (Exception e)
+        {
+            error = e.Message;
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    // the user id comes from the "Id" claim SimpleAuthProvider adds on login
+    private async Task<int?> GetLoggedInUserIdAsync()
+    {
+        AuthenticationState authState = await State;
+        ClaimsPrincipal user = authState.User;
+        if (user.Identity == null || !user.Identity.IsAuthenticated)
+        {
+            return null;
+        }
+
+        Claim? idClaim = user.Claims.SingleOrDefault(c => c.Type == "Id");
+        return idClaim == null ? null : int.Parse(idClaim.Value);
+    }
+
+    private static int UserIdOf(ClaimsPrincipal user)
+    {
+        return int.TryParse(user.FindFirst("Id")?.Value, out int id) ? id : 0;
+    }
+}
