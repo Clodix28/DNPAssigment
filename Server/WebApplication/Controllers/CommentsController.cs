@@ -1,6 +1,7 @@
 using ApiContracts.Comments;
 using Entities;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using RepositoryContracts;
 
 namespace Controllers;
@@ -57,26 +58,31 @@ public class CommentsController : ControllerBase
     }
 
     [HttpGet]
-    public ActionResult<IEnumerable<CommentDto>> GetComments(
+    public async Task<ActionResult<IEnumerable<CommentDto>>> GetComments(
         [FromQuery] int? userId = null,
         [FromQuery] string? userName = null,
         [FromQuery] int? postId = null)
     {
-        IEnumerable<Comment> comments = _commentRepository.GetMany()
+        IQueryable<Comment> query = _commentRepository.GetMany()
             .Where(c => userId == null || c.UserId == userId)
-            .Where(c => postId == null || c.PostId == postId)
-            .ToList();
+            .Where(c => postId == null || c.PostId == postId);
 
         if (userName != null)
         {
-            HashSet<int> matchingUserIds = _userRepository.GetMany()
-                .Where(u => u.Username.ToLower().Contains(userName.ToLower()))
-                .Select(u => u.Id)
-                .ToHashSet();
-            comments = comments.Where(c => matchingUserIds.Contains(c.UserId));
+            query = query.Where(c => c.User.Username.ToLower().Contains(userName.ToLower()));
         }
 
-        return Ok(comments.Select(ToDto));
+        List<CommentDto> comments = await query
+            .Select(c => new CommentDto
+            {
+                Id = c.Id,
+                Body = c.Body,
+                UserId = c.UserId,
+                PostId = c.PostId
+            })
+            .ToListAsync();
+
+        return Ok(comments);
     }
 
     [HttpGet("{id:int}")]

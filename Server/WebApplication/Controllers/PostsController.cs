@@ -1,6 +1,9 @@
+using ApiContracts.Comments;
 using ApiContracts.Posts;
+using ApiContracts.Users;
 using Entities;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using RepositoryContracts;
 
 namespace Controllers;
@@ -39,46 +42,95 @@ public class PostsController : ControllerBase
         };
 
         Post created = await _postRepository.AddAsync(post);
+        // send a dto back, the entity has User and Comments on it and would loop forever as json
         PostDto dto = ToDto(created);
         return Created($"/posts/{dto.Id}", dto);
     }
 
     [HttpGet]
-    public ActionResult<IEnumerable<PostDto>> GetPosts(
+    public async Task<ActionResult<IEnumerable<PostDto>>> GetPosts(
         [FromQuery] string? titleContains = null,
         [FromQuery] int? userId = null,
         [FromQuery] string? userName = null)
     {
-        IEnumerable<Post> posts = _postRepository.GetMany()
+        IQueryable<Post> query = _postRepository.GetMany()
             .Where(p => titleContains == null ||
                         p.Title.ToLower().Contains(titleContains.ToLower()))
-            .Where(p => userId == null || p.UserId == userId)
-            .ToList();
+            .Where(p => userId == null || p.UserId == userId);
 
         if (userName != null)
         {
-            HashSet<int> matchingUserIds = _userRepository.GetMany()
-                .Where(u => u.Username.ToLower().Contains(userName.ToLower()))
-                .Select(u => u.Id)
-                .ToHashSet();
-            posts = posts.Where(p => matchingUserIds.Contains(p.UserId));
+            // thanks to the navigation property we can filter on the author's name right in the query
+            query = query.Where(p => p.User.Username.ToLower().Contains(userName.ToLower()));
         }
 
-        return Ok(posts.Select(ToDto));
+        List<PostDto> posts = await query
+            .Select(p => new PostDto
+            {
+                Id = p.Id,
+                Title = p.Title,
+                Body = p.Body,
+                UserId = p.UserId,
+                SubForumId = p.SubForumId
+            })
+            .ToListAsync();
+
+        return Ok(posts);
     }
 
     [HttpGet("{id:int}")]
-    public async Task<ActionResult<PostDto>> GetSingle([FromRoute] int id)
+    public async Task<ActionResult<PostDto>> GetSingle(
+        [FromRoute] int id,
+        [FromQuery] bool includeAuthor = false,
+        [FromQuery] bool includeComments = false)
     {
-        try
+        IQueryable<Post> query = _postRepository.GetMany().Where(p => p.Id == id);
+
+        if (includeAuthor)
         {
-            Post post = await _postRepository.GetSingleAsync(id);
-            return Ok(ToDto(post));
+            query = query.Include(p => p.User);
         }
-        catch (InvalidOperationException e)
+
+        if (includeComments)
         {
-            return NotFound(e.Message);
+            query = query.Include(p => p.Comments);
         }
+
+        // nothing has hit the database yet, FirstOrDefaultAsync turns all of it into one sql query
+        PostDto? dto = await query
+            .Select(p => new PostDto
+            {
+                Id = p.Id,
+                Title = p.Title,
+                Body = p.Body,
+                UserId = p.UserId,
+                SubForumId = p.SubForumId,
+                Author = includeAuthor
+                    ? new UserDto
+                    {
+                        Id = p.User.Id,
+                        Username = p.User.Username,
+                        Email = p.User.Email
+                    }
+                    : null,
+                Comments = includeComments
+                    ? p.Comments.Select(c => new CommentDto
+                    {
+                        Id = c.Id,
+                        Body = c.Body,
+                        UserId = c.UserId,
+                        PostId = c.PostId
+                    }).ToList()
+                    : new()
+            })
+            .FirstOrDefaultAsync();
+
+        if (dto == null)
+        {
+            return NotFound($"Post with ID '{id}' not found");
+        }
+
+        return Ok(dto);
     }
 
     [HttpPut("{id:int}")]

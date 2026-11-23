@@ -1,6 +1,7 @@
 using ApiContracts.Users;
 using Entities;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using RepositoryContracts;
 
 namespace Controllers;
@@ -19,8 +20,8 @@ public class UsersController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<UserDto>> AddUser([FromBody] CreateUserDto request)
     {
-        bool usernameTaken = _userRepository.GetMany()
-            .Any(u => u.Username.ToLower() == request.Username.ToLower());
+        bool usernameTaken = await _userRepository.GetMany()
+            .AnyAsync(u => u.Username.ToLower() == request.Username.ToLower());
         if (usernameTaken)
         {
             return BadRequest($"Username '{request.Username}' is already taken.");
@@ -39,12 +40,18 @@ public class UsersController : ControllerBase
     }
 
     [HttpGet]
-    public ActionResult<IEnumerable<UserDto>> GetUsers([FromQuery] string? userNameContains = null)
+    public async Task<ActionResult<IEnumerable<UserDto>>> GetUsers([FromQuery] string? userNameContains = null)
     {
-        IEnumerable<UserDto> users = _userRepository.GetMany()
+        List<UserDto> users = await _userRepository.GetMany()
             .Where(u => userNameContains == null ||
                         u.Username.ToLower().Contains(userNameContains.ToLower()))
-            .Select(ToDto);
+            .Select(u => new UserDto
+            {
+                Id = u.Id,
+                Username = u.Username,
+                Email = u.Email
+            })
+            .ToListAsync();
 
         return Ok(users);
     }
